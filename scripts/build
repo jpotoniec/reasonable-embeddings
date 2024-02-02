@@ -10,14 +10,13 @@ for cmd in cython $CC $CXX; do
 	command -v "$cmd" &>/dev/null || panic "fatal error: $cmd is not installed"
 done
 
-PYTHON_HEADERS="${CONDA_PREFIX:-/usr}/include/python3.9"
+PYTHON_HEADERS=$(python3-config --includes)
 FACTPP_HEADERS="factplusplus/Kernel"
 
 CFLAGS="-O2 -Wall -Wextra -fPIC -ffast-math -pipe -march=native -I$FACTPP_HEADERS"
-CPYFLAGS="$CFLAGS -shared -pthread -fwrapv -fstack-clash-protection -fno-strict-aliasing -I$PYTHON_HEADERS"
+CPYFLAGS="$CFLAGS -shared -pthread -fwrapv -fstack-clash-protection -fno-strict-aliasing $PYTHON_HEADERS"
 CXX="$CXX --std=c++11"
 
-[ -f "$PYTHON_HEADERS/Python.h" ] || panic "fatal error: Python headers not found in $PYTHON_HEADERS (activate a conda environment with Python headers installed, or set the header path manually by setting PYTHON_HEADERS in this script)"
 [ -d factplusplus/Kernel ] || panic "fatal error: factplusplus repository is empty (clone the submodule)"
 
 mkdir -p build/kernel
