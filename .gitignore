@@ -3,6 +3,8 @@ src/simplefact/factpp.so
 src/simplefact/owlfun.so
 __pycache__/
 .ipynb_checkpoints/
+**/.idea/
+*/dependency-reduced-pom.xml
 
 !local/
 local/*
