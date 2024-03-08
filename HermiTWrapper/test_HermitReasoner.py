@@ -1,6 +1,18 @@
 from src.simplefact import Onto
-from src.simplefact.syntax import SUB
+from src.simplefact.syntax import SUB, TOP, DIS
 from .HermitReasoner import HermitReasoner
+
+
+def test_add_remove_axioms():
+	with HermitReasoner() as reasoner:
+		reasoner.add_axiom((DIS, 1, 2))
+		assert reasoner.is_consistent()
+		reasoner.add_axiom((SUB, TOP, 1))
+		assert reasoner.is_consistent()
+		reasoner.add_axiom((SUB, TOP, 2))
+		assert not reasoner.is_consistent()
+		reasoner.retract_last()
+		assert reasoner.is_consistent()
 
 
 def test_trivial_inference():

@@ -28,24 +28,20 @@ class DataGenerator:
 		self.rng = rng
 		self.max_failures = 100
 
-	def generate_kb(self, hp: KBHiperparameters, depth: int) -> Tuple[Onto, Reasoner]:
+	def generate_kb(self, hp: KBHiperparameters, depth: int) -> Onto:
 		gen = UniformMaxHeightTreeGenerator(depth)
-		for _ in range(self.max_failures):
+		for _ in trange(self.max_failures, position=1, desc="FAIL"):
 			forest = [gen.generate(self.rng) for _ in range(hp.n_axioms)]
 			axiom_generator = AxiomGeneratorRL(rng=self.rng, n_atomic=hp.n_atomic, p_atomic=hp.p_atomic,
 											   n_roles=hp.n_roles)
 			onto = Onto(tbox=set(), n_concepts=axiom_generator.n_atomic, n_roles=axiom_generator.n_roles)
-			reasoner = Reasoner(n_concepts=onto.n_concepts, n_roles=onto.n_roles, timeout=REASONER_TIMEOUT)
-			for role in range(hp.n_roles):
-				reasoner.add_axiom((SUB, (ANY, role, 0), TOP))
-			if populate_onto(reasoner, onto, trees=forest, generate=axiom_generator.populate_tree):
-				return onto, reasoner
+			if populate_onto(onto, trees=forest, generate=axiom_generator.populate_tree):
+				return onto
 		raise RuntimeError("Maximum number of failures exceeded")
 
 	def generate_queries(self, hp: KBHiperparameters, depth: int, n_queries: int) -> list[Axiom]:
 		gen = UniformMaxHeightTreeGenerator(depth)
-		axiom_generator = AxiomGeneratorRL(rng=self.rng, n_atomic=hp.n_atomic, p_atomic=hp.p_atomic,
-										   n_roles=hp.n_roles)
+		axiom_generator = AxiomGeneratorRL(rng=self.rng, n_atomic=hp.n_atomic, p_atomic=hp.p_atomic, n_roles=hp.n_roles)
 		queries = set()
 		while len(queries) < n_queries:
 			tree = gen.generate(self.rng)
@@ -78,18 +74,16 @@ def generate_dataset(*, rng: np.random.Generator, n_onto: int, n_queries: int, m
 
 	for hp in tqdm(hiperparameters, position=0, desc="HP"):
 		kbs = {}
-		reasoners = {}
 		for depth in trange(min_depth, max_depth + 1, position=1, desc="KB"):
-			kb, reasoner = dg.generate_kb(hp, depth)
-			kbs[depth] = kb
-			reasoners[depth] = reasoner
+			kbs[depth] = dg.generate_kb(hp, depth)
 		queries = {depth: dg.generate_queries(hp, depth, n_queries) for depth in
 				   trange(min_depth, max_depth + 1, position=1, desc="Q ")}
 		labels = {}
-		for kb_depth in trange(min_depth, max_depth + 1, position=1, desc="L1"):
-			with HermitReasoner(kbs[kb_depth]) as reasoner:
-				for queries_depth in trange(min_depth, max_depth + 1, position=2, desc="L2"):
-					labels[(kb_depth, queries_depth)] = dg.label_queries(reasoner, queries[queries_depth])
+		if n_queries > 0:
+			for kb_depth in trange(min_depth, max_depth + 1, position=1, desc="L1"):
+				with HermitReasoner(kbs[kb_depth]) as reasoner:
+					for queries_depth in trange(min_depth, max_depth + 1, position=2, desc="L2"):
+						labels[(kb_depth, queries_depth)] = dg.label_queries(reasoner, queries[queries_depth])
 		results.append((kbs, queries, labels))
 
 	return [hiperparameters, results]

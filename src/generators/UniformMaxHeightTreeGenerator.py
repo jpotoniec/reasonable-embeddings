@@ -8,6 +8,7 @@ import dill
 import numpy as np
 from tqdm import trange, tqdm
 
+from HermiTWrapper import HermitReasoner
 from src.generate import REASONER_TIMEOUT
 from src.simplefact import Onto, Reasoner, Axiom
 from src.simplefact.syntax import BOT
@@ -90,40 +91,40 @@ def populate_onto2(reasoner: Reasoner, onto: Onto, *, trees: list[Tree], generat
 	return consistent and unsatisfiable < max_unsat
 
 
-def populate_onto(reasoner: Reasoner, onto: Onto, *, trees: list[Tree], generate: Callable[[Tree], Axiom],
+def populate_onto(onto: Onto, *, trees: list[Tree], generate: Callable[[Tree], Axiom],
 				  max_unsat=0.1, max_consecutive_failures: int = 100) -> bool:
-	# TODO perhasp reasoner should be created here?
-	max_unsat = int(max_unsat * onto.n_concepts)
-	failures = 0
-	i = 0
-	while i < len(trees):
-		axiom = generate(trees[i])
-		if axiom in onto.tbox:
-			continue
-		reasoner.add_axiom(axiom)
-		unsatisfiable = 0
-		try:
-			consistent = reasoner.is_consistent()
-			if consistent:
-				for c in range(onto.n_concepts):
-					if reasoner.check_sub(c, BOT):
-						unsatisfiable += 1
-						if unsatisfiable >= max_unsat:
-							break
-		except RuntimeError as e:
-			print(e, file=sys.stderr)
-			return False
-
-		if consistent and unsatisfiable < max_unsat:
-			onto.tbox.add(axiom)
-			# rdf.to_rdf(onto).serialize("/tmp/a.ttl")
-			i += 1
-		else:
-			reasoner.retract_last()
-			failures += 1
-			if failures > max_consecutive_failures:
+	with HermitReasoner() as reasoner:
+		max_unsat = int(max_unsat * onto.n_concepts)
+		failures = 0
+		i = 0
+		while i < len(trees):
+			axiom = generate(trees[i])
+			if axiom in onto.tbox:
+				continue
+			reasoner.add_axiom(axiom)
+			unsatisfiable = 0
+			try:
+				consistent = reasoner.is_consistent()
+				if consistent:
+					for c in range(onto.n_concepts):
+						if reasoner.check_sub(c, BOT):
+							unsatisfiable += 1
+							if unsatisfiable >= max_unsat:
+								break
+			except RuntimeError as e:
+				print(e, file=sys.stderr)
 				return False
-	return True
+
+			if consistent and unsatisfiable < max_unsat:
+				onto.tbox.add(axiom)
+				# rdf.to_rdf(onto).serialize("/tmp/a.ttl")
+				i += 1
+			else:
+				reasoner.retract_last()
+				failures += 1
+				if failures > max_consecutive_failures:
+					return False
+		return True
 
 
 def step(rng: np.random.Generator, hp: OntoHiperparameters, depth: int, n_queries: int,
